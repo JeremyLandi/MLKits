@@ -1,4 +1,3 @@
-const k = 3;
 let outputs = [];
 
 // Everytime a ball is dropped into a bucket
@@ -6,8 +5,14 @@ const onScoreUpdate = (dropPosition, bounciness, size, bucketLabel) => {
   outputs.push([dropPosition, bounciness, size, bucketLabel]);
 }
 
-// Gets absolute difference between the 2 distances
-const distance = (pointA, pointB) => Math.abs(pointA - pointB);
+// *** N-Dimension distance using Pythagorean Theorem
+const distance = (pointA, pointB) => {
+  return _.chain(pointA)
+          .zip(pointB)                 // Creates an array of grouped elements, the first of which contains the first elements of the given arrays and so on.
+          .map(([a, b]) => (a-b)**2)
+          .sum()
+          .value() ** 0.5;
+};
 
 const splitDataset = (data, testCount) => {
   const shuffled = _.shuffle(data);
@@ -18,29 +23,38 @@ const splitDataset = (data, testCount) => {
 }
 
 // k-nearest neightbors (classification)
-const knn = (data, point) => {
+const knn = (data, point, k) => {
   return _.chain(data)
-  .map(row => [distance(row[0], point), row[3]])  // Returns new array with "absolute" distance and bucket number
-  .sortBy(row => row[0])                          // Sorts from smallest distance to greatest
-  .slice(0, k)                                    // Gets the top "k" amount
-  .countBy(row => row[1])                         // Returns an object with the bucket # as the Key, and the 'count' of those buckets as the Value  
-  .toPairs()                                      // Returns an array or arrays from an object
-  .sortBy(row => row[1])                          // Sorts smallest 'count' to the greatest 'count'
-  .last()                                         // Returns array with greatest 'count'
-  .first()                                        // Returns greatest count (as string)
+  .map(row => {
+    return [
+      distance( _.initial(row), point),  // _.initial gets all except last value of array
+      _.last(row)
+    ];
+  })                                     // Returns new array with "absolute" distance and bucket number
+  .sortBy(row => row[0])                 // Sorts from smallest distance to greatest
+  .slice(0, k)                           // Gets the top "k" amount
+  .countBy(row => row[1])                // Returns an object with the bucket # as the Key, and the 'count' of those buckets as the Value  
+  .toPairs()                             // Returns an array or arrays from an object
+  .sortBy(row => row[1])                 // Sorts smallest 'count' to the greatest 'count'
+  .last()                                // Returns array with greatest 'count'
+  .first()                               // Returns greatest count (as string)
   .parseInt()
   .value();
 }
 
 const runAnalysis = () => {
-  const testSetSize = 10;
+  const testSetSize = 100;
   const [testSet, trainingSet] = splitDataset(outputs, testSetSize);
   
-  const accuracy = _.chain(testSet)
-    .filter(testPoint => knn(trainingSet, testPoint[0]) === testPoint[3]) // Returns the sets that were correct
-    .size()                                                               // Counts the number of sets correct
-    .divide(testSetSize)
-    .multiply(100)
-    .value();
-    console.log("Accuracy is:", accuracy+"%");
+  _.range(1, 11).forEach(k => {
+    const accuracy = _.chain(testSet)
+      .filter(testPoint => {
+        return knn(trainingSet, _.initial(testPoint), k) === testPoint[3];
+      })                                                                   // Returns the sets that were correct
+      .size()                                                              // Counts the number of sets correct
+      .divide(testSetSize)
+      .multiply(100)
+      .value();
+    console.log("for k of",k, "Accuracy is:", accuracy+"%");
+  });
 }
